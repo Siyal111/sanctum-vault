@@ -1177,7 +1177,7 @@ async function callVault(messages, onChunk, onDone, onError) {
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': 'PASTE_YOUR_NEW_API_KEY_HERE', 'anthropic-dangerous-direct-browser-access': 'true' },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': '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', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4096,
