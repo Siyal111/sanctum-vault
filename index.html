@@ -343,7 +343,7 @@ body {
   color: var(--ruby);
 }
 .avatar.bot-av {
-  background: linear-gradient(135deg, var(--g4), rgba(62,47,16,0.8));
+   background: linear-gradient(135deg, var(--g4), rgba(62,47,16,0.8));
   border-color: var(--border-hi);
   color: var(--g2);
   animation: avatarPulse 4s ease-in-out infinite;
@@ -679,7 +679,7 @@ body {
 ═══════════════════════════════════════════ */
 .stream-cursor {
   display: inline-block;
-width: 2px; height: 16px;
+  width: 2px; height: 16px;
   background: var(--g2);
   margin-left: 2px;
   vertical-align: middle;
@@ -1178,19 +1178,33 @@ function showError(msg) {
 // ══════════════════════════════════════════════════════════
 //  STREAMING API
 // ══════════════════════════════════════════════════════════
+// FREE GEMINI API — Get key at: aistudio.google.com/apikey
+const GEMINI_API_KEY = 'AIzaSyDl-ACThQ_0nJxLtVttvJCTFDwqVfqjAg4';
+const GEMINI_MODEL = 'gemini-2.0-flash';
+
 async function callVault(messages, onChunk, onDone, onError) {
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': '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', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4096,
-        system: SYSTEM_PROMPT,
-        stream: true,
-        messages
-      })
-    });
+    const geminiMessages = messages.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }));
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents: geminiMessages,
+          generationConfig: {
+            maxOutputTokens: 8192,
+            temperature: 0.9,
+            topP: 0.95
+          }
+        })
+      }
+    );
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -1200,7 +1214,7 @@ async function callVault(messages, onChunk, onDone, onError) {
 
     const reader = res.body.getReader();
     const dec = new TextDecoder();
-    let buf = '', inTok = 0, outTok = 0;
+    let buf = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1211,13 +1225,12 @@ async function callVault(messages, onChunk, onDone, onError) {
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
         const raw = line.slice(6).trim();
-        if (raw === '[DONE]') continue;
+        if (!raw || raw === '[DONE]') continue;
         try {
           const evt = JSON.parse(raw);
-          if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') onChunk(evt.delta.text);
-          if (evt.type === 'message_start' && evt.message?.usage) inTok = evt.message.usage.input_tokens || 0;
-          if (evt.type === 'message_delta' && evt.usage) outTok = evt.usage.output_tokens || 0;
-          if (evt.type === 'message_stop') { updateTokens(inTok + outTok); onDone(); return; }
+          const text = evt.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) onChunk(text);
+          if (evt.usageMetadata) updateTokens(evt.usageMetadata.totalTokenCount || 0);
         } catch(_) {}
       }
     }
