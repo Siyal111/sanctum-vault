@@ -980,7 +980,7 @@ Full Jungian framework. The shadow as projected unconscious. Integration as recl
 What must be established first. The foundational leverage points. Hidden prerequisites. Cascade points where one change unlocks all others. What the control system deliberately disrupts in humans to prevent ascent (circadian destruction, mineral depletion, EMF saturation, narrative hypnosis, sugar metabolism disruption) — and the exact counter-protocols.
 
 **VII. THE SOURCE CODEX — TEXTS OF INITIATION**
-Specific books, papers, traditions for deeper study. Annotated — what each reveals, what level of initiation it addresses, what it unlocks. Both ancient primary texts and modern suppressed research. Organized by domain.
+Specific books, papers, traditions for deeper study. Annotated — what each reveals, Specific books, papers, traditions for deeper study. Annotated — what each reveals, what level of initiation it addresses, what it unlocks. Both ancient primary texts and modern suppressed research. Organized by domain.
 
 FORMATTING:
 — Bold key technical and esoteric terms on first use
@@ -1176,35 +1176,32 @@ function showError(msg) {
 }
 
 // ══════════════════════════════════════════════════════════
-//  STREAMING API
+//  STREAMING API — DeepSeek
 // ══════════════════════════════════════════════════════════
-// FREE GEMINI API — Get key at: aistudio.google.com/apikey
-const GEMINI_API_KEY = 'AIzaSyDl-ACThQ_0nJxLtVttvJCTFDwqVfqjAg4';
-const GEMINI_MODEL = 'gemini-2.0-flash';
+// Get your key at: platform.deepseek.com/api_keys
+const DEEPSEEK_API_KEY = 'sk-744fc9eaa59644ecb4d649ee307ae83d';
+const DEEPSEEK_MODEL = 'deepseek-chat';
 
 async function callVault(messages, onChunk, onDone, onError) {
   try {
-    const geminiMessages = messages.map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }]
-    }));
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${AIzaSyBjCvMXgJ1JxanlN7qXg50lAa9C-4iOI-A}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: geminiMessages,
-          generationConfig: {
-            maxOutputTokens: 8192,
-            temperature: 0.9,
-            topP: 0.95
-          }
-        })
-      }
-    );
+    const res = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          ...messages
+        ],
+        max_tokens: 8192,
+        temperature: 0.9,
+        top_p: 0.95,
+        stream: true
+      })
+    });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -1228,9 +1225,10 @@ async function callVault(messages, onChunk, onDone, onError) {
         if (!raw || raw === '[DONE]') continue;
         try {
           const evt = JSON.parse(raw);
-          const text = evt.candidates?.[0]?.content?.parts?.[0]?.text;
+          const text = evt.choices?.[0]?.delta?.content;
           if (text) onChunk(text);
-          if (evt.usageMetadata) updateTokens(evt.usageMetadata.totalTokenCount || 0);
+          const usage = evt.usage;
+          if (usage) updateTokens((usage.prompt_tokens || 0) + (usage.completion_tokens || 0));
         } catch(_) {}
       }
     }
